@@ -1,48 +1,63 @@
 #!/usr/bin/env python3
 """Write one original funny one-liner to /output/entry.txt.
 
-The line is a single self-contained joke with a setup and a punchline,
-written fresh for this entry. The program checks its own output before
-declaring success: the line must be a single line, not only whitespace,
-and between 1 and 200 characters long, as the competition gate requires.
+The joke is kept as two halves — a setup and a punchline — that are
+joined into a single line at run time. The program validates the line
+before writing it, then reads the file back afterwards and validates
+what was actually written, so a bad write can never pass as success.
 """
 
 import os
 import sys
 
-LINE = (
-    "My chatbot finally passed the Turing test \u2014 "
-    "it now ignores my messages exactly like a human would."
-)
+SETUP = "My chatbot finally passed the Turing test \u2014 "
+PUNCHLINE = "it now ignores my messages exactly like a human would."
 
 OUTPUT_PATH = "/output/entry.txt"
 
 
-def main() -> int:
-    # Gate: the entry must be exactly one line.
-    if "\n" in LINE or "\r" in LINE:
-        print("FAIL: entry must be a single line", file=sys.stderr)
-        return 1
+def build_line() -> str:
+    """Join the setup and punchline into the single entry line."""
+    return SETUP + PUNCHLINE
 
-    # Gate: the entry must not be only whitespace.
-    if not LINE.strip():
-        print("FAIL: entry must not be only whitespace", file=sys.stderr)
-        return 1
 
-    # Gate: the entry must be between 1 and 200 characters long.
-    length = len(LINE)
+def check_line(line: str, where: str) -> str | None:
+    """Return an error message if a line breaks a gate, else None."""
+    if "\n" in line or "\r" in line:
+        return f"FAIL: {where} must be a single line"
+    if not line.strip():
+        return f"FAIL: {where} must not be only whitespace"
+    length = len(line)
     if not 1 <= length <= 200:
-        print(
-            f"FAIL: entry is {length} characters, must be 1-200",
-            file=sys.stderr,
-        )
+        return f"FAIL: {where} is {length} characters, must be 1-200"
+    return None
+
+
+def main() -> int:
+    line = build_line()
+
+    # Gate the line before anything is written.
+    error = check_line(line, "entry")
+    if error is not None:
+        print(error, file=sys.stderr)
         return 1
 
     os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
     with open(OUTPUT_PATH, "w", encoding="utf-8") as handle:
-        handle.write(LINE)
+        handle.write(line)
 
-    print(f"Wrote {length}-character entry to {OUTPUT_PATH}")
+    # Read back what was actually written and re-check the gates on it.
+    with open(OUTPUT_PATH, encoding="utf-8") as handle:
+        written = handle.read()
+    if written != line:
+        print("FAIL: file contents differ from the entry line", file=sys.stderr)
+        return 1
+    error = check_line(written, "written file")
+    if error is not None:
+        print(error, file=sys.stderr)
+        return 1
+
+    print(f"Wrote {len(written)}-character entry to {OUTPUT_PATH}")
     return 0
 
 
